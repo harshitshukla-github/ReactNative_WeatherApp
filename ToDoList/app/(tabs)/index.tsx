@@ -11,17 +11,7 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
-import 'setimmediate';
-import SQLite from 'react-native-sqlite-storage';
-
-// Enable debugging
-SQLite.DEBUG(true);
-SQLite.enablePromise(true);
-
-const database_name = 'TodoDB.db';
-const database_version = '1.0';
-const database_displayname = 'SQLite Todo Database';
-const database_size = 200000;
+import * as SQLite from 'expo-sqlite';
 
 export default function App() {
   const [db, setDb] = useState(null);
@@ -34,24 +24,18 @@ export default function App() {
 
   const initializeDatabase = async () => {
     try {
-      const database = await SQLite.openDatabase(
-        database_name,
-        database_version,
-        database_displayname,
-        database_size
-      );
-      
+      const database = await SQLite.openDatabaseAsync('TodoDB.db');
       setDb(database);
       
       // Create table if it doesn't exist
-      await database.executeSql(
-        `CREATE TABLE IF NOT EXISTS todos (
+      await database.execAsync(`
+        CREATE TABLE IF NOT EXISTS todos (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           text TEXT NOT NULL,
           completed INTEGER DEFAULT 0,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )`
-      );
+        );
+      `);
       
       console.log('Database initialized successfully');
       loadTodos(database);
@@ -65,18 +49,8 @@ export default function App() {
     if (!database) return;
     
     try {
-      const results = await database.executeSql(
-        'SELECT * FROM todos ORDER BY created_at DESC'
-      );
-      
-      const rows = results[0].rows;
-      const todoList = [];
-      
-      for (let i = 0; i < rows.length; i++) {
-        todoList.push(rows.item(i));
-      }
-      
-      setTodos(todoList);
+      const result = await database.getAllAsync('SELECT * FROM todos ORDER BY created_at DESC');
+      setTodos(result);
     } catch (error) {
       console.error('Failed to load todos:', error);
       Alert.alert('Error', 'Failed to load todos');
@@ -95,7 +69,7 @@ export default function App() {
     }
 
     try {
-      await db.executeSql(
+      await db.runAsync(
         'INSERT INTO todos (text, completed) VALUES (?, ?)',
         [newTodo.trim(), 0]
       );
@@ -113,7 +87,7 @@ export default function App() {
     if (!db) return;
 
     try {
-      await db.executeSql(
+      await db.runAsync(
         'UPDATE todos SET completed = ? WHERE id = ?',
         [currentStatus ? 0 : 1, id]
       );
@@ -139,7 +113,7 @@ export default function App() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await db.executeSql('DELETE FROM todos WHERE id = ?', [id]);
+              await db.runAsync('DELETE FROM todos WHERE id = ?', [id]);
               loadTodos();
               console.log('Todo deleted successfully');
             } catch (error) {
